@@ -1,36 +1,57 @@
-const Web3 = require('web3');
-const EthereumTransaction = require('ethereumjs-tx');
-const url = 'HTTP://127.0.0.1:7545';
-
+const Web3 = require("web3");
+const url = "HTTP://127.0.0.1:7545";
 const web3 = new Web3(url);
+var { Transaction } = require("ethereumjs-tx");
 
-const sendingAddress = '0xab75b07C053434bc1DdbeAa05b5229AcDA1fb64f';
-const receivingAddress = '0xE8DDD32dF65d46Ac8bb82Aa2E97bD2d7aadCBAb6';
+const sendingAddress = "0x4f84bDa2EF552B7fde57789dc20176d6eaeDDD86";
+const receivingAddress = "0xef8792090789a8D0E8a97753397cE2021fC6cB64";
 
+//get balance of sending and receiving address.
 web3.eth.getBalance(sendingAddress).then(console.log);
 web3.eth.getBalance(receivingAddress).then(console.log);
 
-web3.eth.getTransactionCount(sendingAddress)
-.then(transactionCount => {
-    var rawTransaction = { 
-        nonce: transactionCount, 
-        to: receivingAddress, 
-        value: 1, 
-        gasLimit: web3.utils.toHex(47123800000000000008),
-        gasPrice: web3.utils.toHex(web3.utils.toWei('100', 'gwei')),
-        // data: "Test Transaction" 
-    };
-    
-    //Pass private key of the sending address
-    const sendingAddressPrivateKey = 'ea7e7e74fa2f8ed591a2d34cb11bb39e9359a2184e8350db2cf79efa9d027ecc';
-    //convert the private key of the sending address to hexidecimal format.
-    const sendingAddressPrivateKeyHex = Buffer.from(sendingAddressPrivateKey, 'hex');
-    //Define a new transaction using ethereumjs-tx library.
-    const transaction = new EthereumTransaction.Transaction(JSON.stringify(rawTransaction));
-    //Sign the transaction using the sending address private key in hexadecimal format.
-    transaction.sign(sendingAddressPrivateKeyHex);
-    
-    //Define the serialize transaction
-    const serializedTransaction = transaction.serialize();
-    web3.eth.sendSignedTransaction(serializedTransaction);
+web3.eth.getTransactionCount(sendingAddress).then(async (transactionCount) => {
+  //Convert value to hexadecimal format
+  const value = web3.utils.toWei("10", "gwei");
+  console.log("value to send:", value);
+  //Get the estimated gas limit using the value, from and to address
+  const gasLimit = await web3.eth.estimateGas({
+    from: sendingAddress,
+    to: receivingAddress,
+    amount: value,
+  });
+  console.log("gas limit:", gasLimit);
+  //Get the gas price
+  const gasPrice = await web3.eth.getGasPrice();
+  console.log("gas price - base fee:", gasPrice);
+  //Define the raw transaction, and convert the transactionCount(nonce), gasPrice, gasLimit, and value to hexadecimal format before signing transaction.
+  var rawTransaction = {
+    nonce: web3.utils.toHex(transactionCount),
+    gasPrice: web3.utils.toHex(gasPrice),
+    gasLimit: web3.utils.toHex(gasLimit),
+    to: receivingAddress,
+    value: web3.utils.toHex(value),
+  };
+
+  //Pass private key of the sending address
+  try {
+    //Convert sending address private key to hexadecimal format.
+    const sendingAddressPrivateKey = Buffer.from(
+      "6f9b0b535433c2c6ded4770b90665cd5ea4d121d3f26e3202ae145d13896becf",
+      "hex"
+    );
+    //Define a new transaction instance.
+    var transaction = new Transaction(rawTransaction);
+    //Sign the transaction instance with the private key./
+    transaction.sign(sendingAddressPrivateKey);
+    //Serialize the transaction
+    var serializedTransaction = transaction.serialize();
+    //Send the signed transaction and log the receipt.
+    await web3.eth
+      .sendSignedTransaction("0x" + serializedTransaction.toString("hex"))
+      .on("receipt", console.log);
+  } catch (error) {
+    //Log the error.
+    console.log(error);
+  }
 });
